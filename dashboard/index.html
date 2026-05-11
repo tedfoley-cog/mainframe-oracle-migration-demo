@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mainframe to Oracle — Migration Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: #f5f7fa;
+      color: #1e293b;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+      color: #fff;
+      text-align: center;
+      padding: 2rem 1rem 1.75rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,.15);
+    }
+    header h1 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 700; }
+    header p { margin-top: .5rem; font-size: .95rem; color: #94a3b8; }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1rem; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      border: 1px solid #e2e8f0;
+      text-align: center;
+    }
+    .card-value { font-size: 2rem; font-weight: 700; color: #0f172a; }
+    .card-label { font-size: .85rem; color: #64748b; margin-top: .25rem; text-transform: uppercase; letter-spacing: .05em; }
+
+    .progress-section { margin-bottom: 2rem; }
+    .progress-section h2 { font-size: 1.1rem; margin-bottom: .75rem; color: #334155; }
+    .progress-bar-bg { background: #e2e8f0; border-radius: 8px; height: 28px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; border-radius: 8px; transition: width 0.6s ease; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 600; color: #fff; }
+    .fill-not-started { background: #94a3b8; }
+    .fill-in-progress { background: #3b82f6; }
+    .fill-completed { background: #10b981; }
+
+    .programs-section { margin-bottom: 2rem; }
+    .programs-section h2 { font-size: 1.1rem; margin-bottom: .75rem; color: #334155; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    th { background: #f8fafc; text-align: left; padding: .75rem 1rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+    td { padding: .75rem 1rem; font-size: .9rem; border-bottom: 1px solid #f1f5f9; }
+    tr:hover td { background: #f8fafc; }
+
+    .badge { display: inline-block; padding: .2rem .6rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+    .badge-not-started { background: #f1f5f9; color: #64748b; }
+    .badge-in-progress { background: #dbeafe; color: #1d4ed8; }
+    .badge-completed { background: #d1fae5; color: #065f46; }
+    .risk-low { color: #10b981; } .risk-medium { color: #f59e0b; } .risk-high { color: #ef4444; font-weight: 600; }
+
+    .mapping-section { margin-bottom: 2rem; }
+    .mapping-section h2 { font-size: 1.1rem; margin-bottom: .75rem; color: #334155; }
+    .mapping-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .mapping-card { background: #fff; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid #e2e8f0; }
+    .mapping-card h3 { font-size: .95rem; margin-bottom: .5rem; color: #0f172a; }
+    .mapping-row { display: flex; justify-content: space-between; align-items: center; padding: .35rem 0; font-size: .85rem; border-bottom: 1px solid #f1f5f9; }
+    .mapping-row:last-child { border-bottom: none; }
+    .mapping-arrow { color: #3b82f6; font-weight: 700; margin: 0 .5rem; }
+
+    footer { text-align: center; padding: 1.5rem; font-size: .8rem; color: #94a3b8; border-top: 1px solid #e2e8f0; background: #fff; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Mainframe to Oracle &mdash; Migration Dashboard</h1>
+  <p>COBOL/IMS/DB2 batch programs &rarr; Oracle PL/SQL packages, SQL*Loader, Oracle Scheduler</p>
+</header>
+
+<div class="container">
+  <div class="summary-grid" id="summary-cards"></div>
+
+  <div class="progress-section">
+    <h2>Overall Migration Progress</h2>
+    <div class="progress-bar-bg" id="progress-bar"></div>
+  </div>
+
+  <div class="programs-section">
+    <h2>Program Migration Status</h2>
+    <table>
+      <thead>
+        <tr><th>Program</th><th>Name</th><th>Lines</th><th>Complexity</th><th>Risk</th><th>Status</th><th>Oracle Package</th></tr>
+      </thead>
+      <tbody id="program-table"></tbody>
+    </table>
+  </div>
+
+  <div class="mapping-section">
+    <h2>IMS DL/I to Oracle SQL Mapping</h2>
+    <div class="mapping-grid" id="ims-mapping"></div>
+  </div>
+
+  <div class="mapping-section">
+    <h2>Copybook to Oracle Table Mapping</h2>
+    <div class="mapping-grid" id="copybook-mapping"></div>
+  </div>
+</div>
+
+<footer>Mainframe to Oracle Migration Demo &mdash; Automotive Manufacturing &copy; 2026</footer>
+
+<script>
+// Embedded initial state (works on file:// protocol without a server)
+var INITIAL_STATE = {
+  "migration_name": "Automotive MFG Mainframe to Oracle",
+  "last_updated": "2026-05-11T00:00:00Z",
+  "status": "not_started",
+  "summary": {
+    "total_programs": 5,
+    "migrated": 0,
+    "in_progress": 0,
+    "not_started": 5,
+    "total_lines_cobol": 1842,
+    "total_copybooks": 5,
+    "total_jcl_jobs": 3,
+    "ims_segments": 4,
+    "db2_tables": 4
+  },
+  "programs": [
+    {
+      "id": "PARTINV",
+      "name": "Parts Inventory Processing",
+      "source_file": "mainframe_source/programs/PARTINV.cbl",
+      "lines": 265,
+      "status": "not_started",
+      "complexity": "medium",
+      "risk": "low",
+      "copybooks_used": ["PARTMSTR", "ERRCODES"],
+      "ims_segments": ["PARTSEG"],
+      "jcl_job": "PARTJOB",
+      "oracle_target": {
+        "package": "PKG_PARTS_INVENTORY",
+        "tables": ["PART_MASTER", "INVENTORY_TRANSACTIONS"],
+        "loader_ctl": "parts_load.ctl",
+        "scheduler_job": "PARTS_NIGHTLY_JOB"
+      },
+      "migration_notes": "Batch inventory transaction processing. IMS GHU/REPL on PARTSEG translates to Oracle UPDATE with SELECT FOR UPDATE. Weighted average cost calculation must preserve COMP-3 precision."
+    },
+    {
+      "id": "BOMEXPL",
+      "name": "Bill of Materials Explosion",
+      "source_file": "mainframe_source/programs/BOMEXPL.cbl",
+      "lines": 247,
+      "status": "not_started",
+      "complexity": "high",
+      "risk": "high",
+      "copybooks_used": ["PARTMSTR", "BOMREC", "ERRCODES"],
+      "ims_segments": ["PARTSEG", "BOMSEG"],
+      "jcl_job": "BOMJOB",
+      "oracle_target": {
+        "package": "PKG_BOM_EXPLOSION",
+        "tables": ["PART_MASTER", "BILL_OF_MATERIALS"],
+        "loader_ctl": "bom_load.ctl",
+        "scheduler_job": "BOM_EXPLOSION_JOB"
+      },
+      "migration_notes": "Recursive BOM traversal via IMS GU/GNP must map to Oracle CONNECT BY or recursive CTE. 15-level depth limit. Scrap factor and lead-time offset calculations are critical for production planning accuracy."
+    },
+    {
+      "id": "SUPPEDI",
+      "name": "Supplier EDI Processing",
+      "source_file": "mainframe_source/programs/SUPPEDI.cbl",
+      "lines": 273,
+      "status": "not_started",
+      "complexity": "high",
+      "risk": "medium",
+      "copybooks_used": ["PARTMSTR", "SUPPLIER", "ERRCODES"],
+      "ims_segments": ["PARTSEG", "SUPPSEG"],
+      "jcl_job": "NIGHTRUN",
+      "oracle_target": {
+        "package": "PKG_SUPPLIER_EDI",
+        "tables": ["PART_MASTER", "SUPPLIER_MASTER", "EDI_TRANSACTIONS"],
+        "loader_ctl": "supplier_load.ctl",
+        "scheduler_job": "EDI_PROCESSING_JOB"
+      },
+      "migration_notes": "ANSI X12 4010 EDI segment parsing (ISA/GS/ST/BSN/HL/SN1/SE). Variable-length records. Dual IMS PCBs (PARTSEG + SUPPSEG) map to separate Oracle table updates within a single transaction."
+    },
+    {
+      "id": "QUALCTL",
+      "name": "Quality Control Inspection",
+      "source_file": "mainframe_source/programs/QUALCTL.cbl",
+      "lines": 315,
+      "status": "not_started",
+      "complexity": "high",
+      "risk": "medium",
+      "copybooks_used": ["PARTMSTR", "QUALREC", "SUPPLIER", "ERRCODES"],
+      "ims_segments": ["PARTSEG", "QUALSEG", "SUPPSEG"],
+      "jcl_job": "NIGHTRUN",
+      "oracle_target": {
+        "package": "PKG_QUALITY_CONTROL",
+        "tables": ["PART_MASTER", "QUALITY_INSPECTIONS", "SUPPLIER_MASTER"],
+        "loader_ctl": "quality_load.ctl",
+        "scheduler_job": "QUALITY_INSPECTION_JOB"
+      },
+      "migration_notes": "AQL acceptance sampling logic and Cpk calculation. IATF 16949 compliance requires full audit trail. IMS ISRT on QUALSEG (child of PARTSEG) maps to Oracle INSERT with FK constraint. Supplier defect-PPM update across PCB boundaries."
+    },
+    {
+      "id": "WARRCLS",
+      "name": "Warranty Claims Settlement",
+      "source_file": "mainframe_source/programs/WARRCLS.cbl",
+      "lines": 318,
+      "status": "not_started",
+      "complexity": "medium",
+      "risk": "medium",
+      "copybooks_used": ["PARTMSTR", "ERRCODES"],
+      "ims_segments": ["PARTSEG"],
+      "jcl_job": "NIGHTRUN",
+      "oracle_target": {
+        "package": "PKG_WARRANTY_CLAIMS",
+        "tables": ["PART_MASTER", "WARRANTY_CLAIMS", "PAYMENT_AUTH"],
+        "loader_ctl": "warranty_load.ctl",
+        "scheduler_job": "WARRANTY_SETTLEMENT_JOB"
+      },
+      "migration_notes": "Four warranty types with different month/mileage limits. Corrosion warranty has declining coverage percentage after 60 months (min 50%). DB2 WARRANTY_CLAIMS table already exists — maps directly to Oracle with CCSID conversion."
+    }
+  ],
+  "copybook_mapping": [
+    {"copybook": "PARTMSTR", "oracle_table": "PART_MASTER", "fields": 28, "notes": "Root IMS segment. COMP-3 packed decimals map to Oracle NUMBER."},
+    {"copybook": "BOMREC", "oracle_table": "BILL_OF_MATERIALS", "fields": 13, "notes": "Child of PARTSEG. Parent-child FK relationship."},
+    {"copybook": "SUPPLIER", "oracle_table": "SUPPLIER_MASTER", "fields": 24, "notes": "Root IMS segment in separate dataset. EDI config fields need VARCHAR2."},
+    {"copybook": "QUALREC", "oracle_table": "QUALITY_INSPECTIONS", "fields": 18, "notes": "Child of PARTSEG. Measurement tolerances map to NUMBER(9,4)."},
+    {"copybook": "ERRCODES", "oracle_table": "ERROR_CODES", "fields": 14, "notes": "Reference data. Static lookup table."}
+  ],
+  "ims_to_oracle_mapping": [
+    {"ims_call": "GU (Get Unique)", "oracle_equivalent": "SELECT ... WHERE pk = :key", "notes": "Direct key lookup"},
+    {"ims_call": "GHU (Get Hold Unique)", "oracle_equivalent": "SELECT ... FOR UPDATE WHERE pk = :key", "notes": "Lock row for update"},
+    {"ims_call": "GNP (Get Next within Parent)", "oracle_equivalent": "CURSOR on child table WHERE parent_fk = :key", "notes": "Child segment traversal"},
+    {"ims_call": "REPL (Replace)", "oracle_equivalent": "UPDATE ... WHERE pk = :key", "notes": "Requires prior GHU/SELECT FOR UPDATE"},
+    {"ims_call": "ISRT (Insert)", "oracle_equivalent": "INSERT INTO child_table VALUES (...)", "notes": "Child segment creation"},
+    {"ims_call": "DLET (Delete)", "oracle_equivalent": "DELETE FROM ... WHERE pk = :key", "notes": "Not used in current programs"}
+  ],
+  "jcl_to_oracle_mapping": [
+    {"jcl_step": "EXEC PGM=DFSRRC00,PARM='DLI,...'", "oracle_equivalent": "DBMS_SCHEDULER.CREATE_JOB with PL/SQL action", "notes": "IMS batch DL/I to Oracle Scheduler"},
+    {"jcl_step": "EXEC PGM=SORT", "oracle_equivalent": "ORDER BY clause in PL/SQL cursor or SQL*Loader", "notes": "External sort to SQL sort"},
+    {"jcl_step": "EXEC PGM=IEBGENER", "oracle_equivalent": "Oracle Data Pump (expdp/impdp)", "notes": "Dataset copy to export"},
+    {"jcl_step": "EXEC PGM=DSNUTILB,PARM='RUNSTATS'", "oracle_equivalent": "DBMS_STATS.GATHER_TABLE_STATS", "notes": "DB2 RUNSTATS to Oracle optimizer stats"},
+    {"jcl_step": "COND=(0,NE,stepname)", "oracle_equivalent": "DBMS_SCHEDULER chain with dependency rules", "notes": "Step-level condition codes"}
+  ]
+};
+
+(async function() {
+  var data;
+  try {
+    var resp = await fetch('migration_state.json');
+    if (resp.ok) data = await resp.json();
+  } catch (e) { /* file:// or network error */ }
+  if (!data) data = INITIAL_STATE;
+  var s = data.summary;
+
+  var cards = [
+    { value: s.total_programs, label: 'COBOL Programs' },
+    { value: s.total_lines_cobol.toLocaleString(), label: 'Lines of COBOL' },
+    { value: s.total_copybooks, label: 'Copybooks' },
+    { value: s.total_jcl_jobs, label: 'JCL Jobs' },
+    { value: s.ims_segments, label: 'IMS Segments' },
+    { value: s.db2_tables, label: 'DB2 Tables' },
+    { value: s.migrated, label: 'Migrated' },
+    { value: Math.round(s.migrated / s.total_programs * 100) + '%', label: 'Progress' }
+  ];
+  document.getElementById('summary-cards').innerHTML = cards.map(function(c) {
+    return '<div class="card"><div class="card-value">' + c.value + '</div><div class="card-label">' + c.label + '</div></div>';
+  }).join('');
+
+  var pct = Math.round(s.migrated / s.total_programs * 100);
+  var cls = pct === 0 ? 'fill-not-started' : pct === 100 ? 'fill-completed' : 'fill-in-progress';
+  document.getElementById('progress-bar').innerHTML =
+    '<div class="progress-bar-fill ' + cls + '" style="width:' + Math.max(pct, 8) + '%">' + pct + '%</div>';
+
+  document.getElementById('program-table').innerHTML = data.programs.map(function(p) {
+    var statusClass = 'badge-' + p.status.replace('_', '-');
+    var riskClass = 'risk-' + p.risk;
+    return '<tr><td><strong>' + p.id + '</strong></td><td>' + p.name + '</td><td>' + p.lines + '</td><td>' + p.complexity + '</td><td class="' + riskClass + '">' + p.risk.toUpperCase() + '</td><td><span class="badge ' + statusClass + '">' + p.status.replace('_', ' ') + '</span></td><td><code>' + p.oracle_target.package + '</code></td></tr>';
+  }).join('');
+
+  document.getElementById('ims-mapping').innerHTML = data.ims_to_oracle_mapping.map(function(m) {
+    return '<div class="mapping-card"><div class="mapping-row"><span><strong>' + m.ims_call + '</strong></span><span class="mapping-arrow">&rarr;</span><span><code>' + m.oracle_equivalent + '</code></span></div><div style="font-size:.8rem;color:#64748b;margin-top:.25rem">' + m.notes + '</div></div>';
+  }).join('');
+
+  document.getElementById('copybook-mapping').innerHTML = data.copybook_mapping.map(function(m) {
+    return '<div class="mapping-card"><h3>' + m.copybook + ' <span class="mapping-arrow">&rarr;</span> ' + m.oracle_table + '</h3><div class="mapping-row"><span>' + m.fields + ' fields</span><span style="font-size:.8rem;color:#64748b">' + m.notes + '</span></div></div>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

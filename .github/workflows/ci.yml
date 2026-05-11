@@ -1,0 +1,90 @@
+name: CI — Mainframe Oracle Migration Demo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate COBOL column formatting
+        run: |
+          errors=0
+          for f in mainframe_source/programs/*.cbl mainframe_source/copybooks/*.cpy; do
+            if [ -f "$f" ]; then
+              line_num=0
+              while IFS= read -r line; do
+                line_num=$((line_num + 1))
+                len=${#line}
+                if [ "$len" -gt 72 ]; then
+                  echo "ERROR: $f:$line_num exceeds 72 columns ($len chars)"
+                  errors=$((errors + 1))
+                fi
+              done < "$f"
+            fi
+          done
+          if [ "$errors" -gt 0 ]; then
+            echo "Found $errors COBOL column violations"
+            exit 1
+          fi
+          echo "All COBOL files pass column check"
+
+      - name: Validate JCL syntax basics
+        run: |
+          errors=0
+          for f in mainframe_source/jcl/*.jcl; do
+            if [ -f "$f" ]; then
+              first_line=$(head -1 "$f")
+              if [[ ! "$first_line" =~ ^// ]]; then
+                echo "ERROR: $f does not start with // (JCL job card)"
+                errors=$((errors + 1))
+              fi
+            fi
+          done
+          if [ "$errors" -gt 0 ]; then
+            echo "Found $errors JCL syntax errors"
+            exit 1
+          fi
+          echo "All JCL files pass basic syntax check"
+
+      - name: Validate repo structure
+        run: |
+          dirs=(
+            "mainframe_source/copybooks"
+            "mainframe_source/programs"
+            "mainframe_source/jcl"
+            "mainframe_source/dbd"
+            "mainframe_source/psb"
+            "mainframe_source/db2"
+            "oracle_target/schema"
+            "oracle_target/packages"
+            "oracle_target/loader"
+            "oracle_target/scheduler"
+            "dashboard"
+            "docs"
+          )
+          for d in "${dirs[@]}"; do
+            if [ ! -d "$d" ]; then
+              echo "ERROR: Missing directory: $d"
+              exit 1
+            fi
+          done
+          echo "Repo structure validated"
+
+      - name: Validate dashboard loads
+        run: |
+          if [ ! -f "dashboard/index.html" ]; then
+            echo "ERROR: dashboard/index.html not found"
+            exit 1
+          fi
+          if [ ! -f "dashboard/migration_state.json" ]; then
+            echo "ERROR: dashboard/migration_state.json not found"
+            exit 1
+          fi
+          python3 -c "import json; json.load(open('dashboard/migration_state.json'))"
+          echo "Dashboard files validated"

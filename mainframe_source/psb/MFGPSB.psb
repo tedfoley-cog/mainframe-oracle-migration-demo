@@ -1,0 +1,64 @@
+*================================================================*
+* MFGPSB - PROGRAM SPECIFICATION BLOCK FOR MANUFACTURING SYSTEM   *
+*                                                                  *
+* DEFINES PROGRAM-LEVEL ACCESS TO THE MFGDB DATABASE.              *
+* USED BY ALL BATCH PROGRAMS (PARTINV, BOMEXPL, SUPPEDI,           *
+* QUALCTL, WARRCLS) VIA THE DLI PARM ON EXEC STATEMENT.           *
+*                                                                  *
+* PCB 1: TP PCB (TERMINAL) - FOR FUTURE ONLINE EXTENSION          *
+* PCB 2: DB PCB FOR PARTSEG (ROOT) WITH BOMSEG, QUALSEG CHILDREN *
+* PCB 3: DB PCB FOR SUPPSEG (ROOT) - SUPPLIER MASTER ACCESS       *
+*================================================================*
+*
+*---------- PCB 1: TP PCB (IO PCB) ----------*
+*
+         PCB   TYPE=TP,MODIFY=YES
+*
+*---------- PCB 2: DATABASE PCB - PARTS/BOM/QUALITY ----------*
+*
+         PCB   TYPE=DB,DBDNAME=MFGDB,KEYLEN=30,                       X
+               PROCOPT=AP
+*
+         SENSEG NAME=PARTSEG,PARENT=0,                                 X
+               PROCOPT=AP
+         SENFLD NAME=PARTNO,START=1
+         SENFLD NAME=PARTDESC,START=16
+         SENFLD NAME=PARTTYPE,START=56
+         SENFLD NAME=QTYHAND,START=79
+         SENFLD NAME=STDCOST,START=104
+         SENFLD NAME=STATUS,START=131
+*
+         SENSEG NAME=BOMSEG,PARENT=PARTSEG,                            X
+               PROCOPT=AP
+         SENFLD NAME=COMPPART,START=16
+         SENFLD NAME=QTYPER,START=31
+         SENFLD NAME=BOMLEVEL,START=39
+         SENFLD NAME=EFFSTART,START=41
+         SENFLD NAME=EFFEND,START=49
+*
+         SENSEG NAME=QUALSEG,PARENT=PARTSEG,                           X
+               PROCOPT=AP
+         SENFLD NAME=INSPID,START=1
+         SENFLD NAME=LOTNUM,START=28
+         SENFLD NAME=VENDCODE,START=40
+         SENFLD NAME=INSPDATE,START=58
+         SENFLD NAME=DISPOSIT,START=167
+*
+*---------- PCB 3: DATABASE PCB - SUPPLIER MASTER ----------*
+*
+         PCB   TYPE=DB,DBDNAME=MFGDB,KEYLEN=10,                       X
+               PROCOPT=AP
+*
+         SENSEG NAME=SUPPSEG,PARENT=0,                                 X
+               PROCOPT=AP
+         SENFLD NAME=VENDCD,START=1
+         SENFLD NAME=VENDNAME,START=11
+         SENFLD NAME=EDIPTNID,START=181
+         SENFLD NAME=ONTIMPCT,START=217
+         SENFLD NAME=QUALRATE,START=220
+         SENFLD NAME=DEFPPM,START=222
+         SENFLD NAME=SUPPSTAT,START=301
+*
+         PSBGEN PSBNAME=MFGPSB,LANG=COBOL,                            X
+               CMPAT=YES
+         END

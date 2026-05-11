@@ -1,0 +1,106 @@
+*================================================================*
+* MFGDB - MANUFACTURING DATABASE DESCRIPTOR                      *
+*                                                                  *
+* IMS HIERARCHICAL DATABASE FOR AUTOMOTIVE MANUFACTURING           *
+* PARTS, BOM, QUALITY, AND SUPPLIER DATA                           *
+*                                                                  *
+* HIERARCHY:                                                       *
+*   PARTSEG (ROOT)                                                 *
+*     +-- BOMSEG  (CHILD - BILL OF MATERIALS)                      *
+*     +-- QUALSEG (CHILD - QUALITY INSPECTIONS)                    *
+*   SUPPSEG (ROOT)                                                 *
+*                                                                  *
+* ACCESS METHOD: HDAM (HIERARCHICAL DIRECT ACCESS METHOD)          *
+* RANDOMIZER: DFSHDC40                                             *
+*================================================================*
+*
+         DBD   NAME=MFGDB,ACCESS=(HDAM,VSAM),                         X
+               RMNAME=(DFSHDC40,20,4)
+*
+         DATASET DD1=MFGDB01,DEVICE=3390,                              X
+               SIZE=(8192)
+*
+*---------- ROOT SEGMENT: PARTS MASTER ----------*
+*
+         SEGM  NAME=PARTSEG,BYTES=256,PARENT=0,                       X
+               RULES=(LLL,LAST),                                      X
+               POINTER=(TWINBWD,HIER)
+*
+         FIELD NAME=(PARTNO,SEQ,U),BYTES=15,START=1,                   X
+               TYPE=C
+         FIELD NAME=PARTDESC,BYTES=40,START=16,                        X
+               TYPE=C
+         FIELD NAME=PARTTYPE,BYTES=2,START=56,                         X
+               TYPE=C
+         FIELD NAME=PLANTCD,BYTES=4,START=71,                          X
+               TYPE=C
+         FIELD NAME=WHSECODE,BYTES=4,START=75,                         X
+               TYPE=C
+         FIELD NAME=QTYHAND,BYTES=5,START=79,                          X
+               TYPE=P
+         FIELD NAME=STDCOST,BYTES=5,START=104,                         X
+               TYPE=P
+         FIELD NAME=STATUS,BYTES=1,START=131,                          X
+               TYPE=C
+*
+*---------- CHILD SEGMENT: BILL OF MATERIALS ----------*
+*
+         SEGM  NAME=BOMSEG,BYTES=128,PARENT=PARTSEG,                  X
+               RULES=(LLL,LAST),                                      X
+               POINTER=(TWINBWD)
+*
+         FIELD NAME=(COMPPART,SEQ,U),BYTES=15,START=16,                X
+               TYPE=C
+         FIELD NAME=QTYPER,BYTES=5,START=31,                           X
+               TYPE=P
+         FIELD NAME=BOMLEVEL,BYTES=2,START=39,                         X
+               TYPE=P
+         FIELD NAME=EFFSTART,BYTES=8,START=41,                         X
+               TYPE=C
+         FIELD NAME=EFFEND,BYTES=8,START=49,                           X
+               TYPE=C
+*
+*---------- CHILD SEGMENT: QUALITY INSPECTIONS ----------*
+*
+         SEGM  NAME=QUALSEG,BYTES=192,PARENT=PARTSEG,                 X
+               RULES=(LLL,LAST),                                      X
+               POINTER=(TWINBWD)
+*
+         FIELD NAME=(INSPID,SEQ,U),BYTES=12,START=1,                   X
+               TYPE=C
+         FIELD NAME=LOTNUM,BYTES=12,START=28,                          X
+               TYPE=C
+         FIELD NAME=VENDCODE,BYTES=10,START=40,                        X
+               TYPE=C
+         FIELD NAME=INSPDATE,BYTES=8,START=58,                         X
+               TYPE=C
+         FIELD NAME=DISPOSIT,BYTES=2,START=167,                        X
+               TYPE=C
+*
+*---------- ROOT SEGMENT: SUPPLIER MASTER ----------*
+*
+         DATASET DD1=MFGDB02,DEVICE=3390,                              X
+               SIZE=(4096)
+*
+         SEGM  NAME=SUPPSEG,BYTES=320,PARENT=0,                       X
+               RULES=(LLL,LAST),                                      X
+               POINTER=(TWINBWD,HIER)
+*
+         FIELD NAME=(VENDCD,SEQ,U),BYTES=10,START=1,                   X
+               TYPE=C
+         FIELD NAME=VENDNAME,BYTES=40,START=11,                        X
+               TYPE=C
+         FIELD NAME=EDIPTNID,BYTES=15,START=181,                       X
+               TYPE=C
+         FIELD NAME=ONTIMPCT,BYTES=3,START=217,                        X
+               TYPE=P
+         FIELD NAME=QUALRATE,BYTES=2,START=220,                        X
+               TYPE=P
+         FIELD NAME=DEFPPM,BYTES=4,START=222,                          X
+               TYPE=P
+         FIELD NAME=SUPPSTAT,BYTES=1,START=301,                        X
+               TYPE=C
+*
+         DBDGEN
+         FINISH
+         END

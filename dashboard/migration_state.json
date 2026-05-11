@@ -1,0 +1,135 @@
+{
+  "migration_name": "Automotive MFG Mainframe to Oracle",
+  "last_updated": "2026-05-11T00:00:00Z",
+  "status": "not_started",
+  "summary": {
+    "total_programs": 5,
+    "migrated": 0,
+    "in_progress": 0,
+    "not_started": 5,
+    "total_lines_cobol": 1842,
+    "total_copybooks": 5,
+    "total_jcl_jobs": 3,
+    "ims_segments": 4,
+    "db2_tables": 4
+  },
+  "programs": [
+    {
+      "id": "PARTINV",
+      "name": "Parts Inventory Processing",
+      "source_file": "mainframe_source/programs/PARTINV.cbl",
+      "lines": 265,
+      "status": "not_started",
+      "complexity": "medium",
+      "risk": "low",
+      "copybooks_used": ["PARTMSTR", "ERRCODES"],
+      "ims_segments": ["PARTSEG"],
+      "jcl_job": "PARTJOB",
+      "oracle_target": {
+        "package": "PKG_PARTS_INVENTORY",
+        "tables": ["PART_MASTER", "INVENTORY_TRANSACTIONS"],
+        "loader_ctl": "parts_load.ctl",
+        "scheduler_job": "PARTS_NIGHTLY_JOB"
+      },
+      "migration_notes": "Batch inventory transaction processing. IMS GHU/REPL on PARTSEG translates to Oracle UPDATE with SELECT FOR UPDATE. Weighted average cost calculation must preserve COMP-3 precision."
+    },
+    {
+      "id": "BOMEXPL",
+      "name": "Bill of Materials Explosion",
+      "source_file": "mainframe_source/programs/BOMEXPL.cbl",
+      "lines": 247,
+      "status": "not_started",
+      "complexity": "high",
+      "risk": "high",
+      "copybooks_used": ["PARTMSTR", "BOMREC", "ERRCODES"],
+      "ims_segments": ["PARTSEG", "BOMSEG"],
+      "jcl_job": "BOMJOB",
+      "oracle_target": {
+        "package": "PKG_BOM_EXPLOSION",
+        "tables": ["PART_MASTER", "BILL_OF_MATERIALS"],
+        "loader_ctl": "bom_load.ctl",
+        "scheduler_job": "BOM_EXPLOSION_JOB"
+      },
+      "migration_notes": "Recursive BOM traversal via IMS GU/GNP must map to Oracle CONNECT BY or recursive CTE. 15-level depth limit. Scrap factor and lead-time offset calculations are critical for production planning accuracy."
+    },
+    {
+      "id": "SUPPEDI",
+      "name": "Supplier EDI Processing",
+      "source_file": "mainframe_source/programs/SUPPEDI.cbl",
+      "lines": 273,
+      "status": "not_started",
+      "complexity": "high",
+      "risk": "medium",
+      "copybooks_used": ["PARTMSTR", "SUPPLIER", "ERRCODES"],
+      "ims_segments": ["PARTSEG", "SUPPSEG"],
+      "jcl_job": "NIGHTRUN",
+      "oracle_target": {
+        "package": "PKG_SUPPLIER_EDI",
+        "tables": ["PART_MASTER", "SUPPLIER_MASTER", "EDI_TRANSACTIONS"],
+        "loader_ctl": "supplier_load.ctl",
+        "scheduler_job": "EDI_PROCESSING_JOB"
+      },
+      "migration_notes": "ANSI X12 4010 EDI segment parsing (ISA/GS/ST/BSN/HL/SN1/SE). Variable-length records. Dual IMS PCBs (PARTSEG + SUPPSEG) map to separate Oracle table updates within a single transaction."
+    },
+    {
+      "id": "QUALCTL",
+      "name": "Quality Control Inspection",
+      "source_file": "mainframe_source/programs/QUALCTL.cbl",
+      "lines": 315,
+      "status": "not_started",
+      "complexity": "high",
+      "risk": "medium",
+      "copybooks_used": ["PARTMSTR", "QUALREC", "SUPPLIER", "ERRCODES"],
+      "ims_segments": ["PARTSEG", "QUALSEG", "SUPPSEG"],
+      "jcl_job": "NIGHTRUN",
+      "oracle_target": {
+        "package": "PKG_QUALITY_CONTROL",
+        "tables": ["PART_MASTER", "QUALITY_INSPECTIONS", "SUPPLIER_MASTER"],
+        "loader_ctl": "quality_load.ctl",
+        "scheduler_job": "QUALITY_INSPECTION_JOB"
+      },
+      "migration_notes": "AQL acceptance sampling logic and Cpk calculation. IATF 16949 compliance requires full audit trail. IMS ISRT on QUALSEG (child of PARTSEG) maps to Oracle INSERT with FK constraint. Supplier defect-PPM update across PCB boundaries."
+    },
+    {
+      "id": "WARRCLS",
+      "name": "Warranty Claims Settlement",
+      "source_file": "mainframe_source/programs/WARRCLS.cbl",
+      "lines": 318,
+      "status": "not_started",
+      "complexity": "medium",
+      "risk": "medium",
+      "copybooks_used": ["PARTMSTR", "ERRCODES"],
+      "ims_segments": ["PARTSEG"],
+      "jcl_job": "NIGHTRUN",
+      "oracle_target": {
+        "package": "PKG_WARRANTY_CLAIMS",
+        "tables": ["PART_MASTER", "WARRANTY_CLAIMS", "PAYMENT_AUTH"],
+        "loader_ctl": "warranty_load.ctl",
+        "scheduler_job": "WARRANTY_SETTLEMENT_JOB"
+      },
+      "migration_notes": "Four warranty types with different month/mileage limits. Corrosion warranty has declining coverage percentage after 60 months (min 50%). DB2 WARRANTY_CLAIMS table already exists — maps directly to Oracle with CCSID conversion."
+    }
+  ],
+  "copybook_mapping": [
+    {"copybook": "PARTMSTR", "oracle_table": "PART_MASTER", "fields": 28, "notes": "Root IMS segment. COMP-3 packed decimals map to Oracle NUMBER."},
+    {"copybook": "BOMREC", "oracle_table": "BILL_OF_MATERIALS", "fields": 13, "notes": "Child of PARTSEG. Parent-child FK relationship."},
+    {"copybook": "SUPPLIER", "oracle_table": "SUPPLIER_MASTER", "fields": 24, "notes": "Root IMS segment in separate dataset. EDI config fields need VARCHAR2."},
+    {"copybook": "QUALREC", "oracle_table": "QUALITY_INSPECTIONS", "fields": 18, "notes": "Child of PARTSEG. Measurement tolerances map to NUMBER(9,4)."},
+    {"copybook": "ERRCODES", "oracle_table": "ERROR_CODES", "fields": 14, "notes": "Reference data. Static lookup table."}
+  ],
+  "ims_to_oracle_mapping": [
+    {"ims_call": "GU (Get Unique)", "oracle_equivalent": "SELECT ... WHERE pk = :key", "notes": "Direct key lookup"},
+    {"ims_call": "GHU (Get Hold Unique)", "oracle_equivalent": "SELECT ... FOR UPDATE WHERE pk = :key", "notes": "Lock row for update"},
+    {"ims_call": "GNP (Get Next within Parent)", "oracle_equivalent": "CURSOR on child table WHERE parent_fk = :key", "notes": "Child segment traversal"},
+    {"ims_call": "REPL (Replace)", "oracle_equivalent": "UPDATE ... WHERE pk = :key", "notes": "Requires prior GHU/SELECT FOR UPDATE"},
+    {"ims_call": "ISRT (Insert)", "oracle_equivalent": "INSERT INTO child_table VALUES (...)", "notes": "Child segment creation"},
+    {"ims_call": "DLET (Delete)", "oracle_equivalent": "DELETE FROM ... WHERE pk = :key", "notes": "Not used in current programs"}
+  ],
+  "jcl_to_oracle_mapping": [
+    {"jcl_step": "EXEC PGM=DFSRRC00,PARM='DLI,...'", "oracle_equivalent": "DBMS_SCHEDULER.CREATE_JOB with PL/SQL action", "notes": "IMS batch DL/I to Oracle Scheduler"},
+    {"jcl_step": "EXEC PGM=SORT", "oracle_equivalent": "ORDER BY clause in PL/SQL cursor or SQL*Loader", "notes": "External sort to SQL sort"},
+    {"jcl_step": "EXEC PGM=IEBGENER", "oracle_equivalent": "Oracle Data Pump (expdp/impdp)", "notes": "Dataset copy to export"},
+    {"jcl_step": "EXEC PGM=DSNUTILB,PARM='RUNSTATS'", "oracle_equivalent": "DBMS_STATS.GATHER_TABLE_STATS", "notes": "DB2 RUNSTATS to Oracle optimizer stats"},
+    {"jcl_step": "COND=(0,NE,stepname)", "oracle_equivalent": "DBMS_SCHEDULER chain with dependency rules", "notes": "Step-level condition codes"}
+  ]
+}

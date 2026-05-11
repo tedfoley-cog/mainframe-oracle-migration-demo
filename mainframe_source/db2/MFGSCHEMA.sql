@@ -1,0 +1,155 @@
+--================================================================--
+-- MFGSCHEMA - DB2 FOR Z/OS TABLE DEFINITIONS                     --
+-- MANUFACTURING SYSTEM RELATIONAL TABLES                          --
+--                                                                  --
+-- THESE TABLES SUPPLEMENT THE IMS HIERARCHICAL DATABASE WITH      --
+-- RELATIONAL DATA USED BY WARRANTY CLAIMS, PRODUCTION ORDERS,     --
+-- AND CROSS-REFERENCE LOOKUPS.                                    --
+--                                                                  --
+-- SUBSYSTEM: DB2P (PRODUCTION)                                    --
+-- DATABASE:  MFGDB                                                --
+-- TABLESPACE: MFGTS                                               --
+--================================================================--
+
+CREATE DATABASE MFGDB
+    STOGROUP MFGSG
+    BUFFERPOOL BP0
+    CCSID EBCDIC;
+
+CREATE TABLESPACE MFGTS
+    IN MFGDB
+    USING STOGROUP MFGSG
+    PRIQTY 7200
+    SECQTY 3600
+    BUFFERPOOL BP0
+    LOCKSIZE ROW
+    CLOSE NO
+    COMPRESS YES;
+
+------------------------------------------------------------------
+-- PRODUCTION_ORDERS: TRACKS BUILD ORDERS FOR THE ASSEMBLY LINE
+------------------------------------------------------------------
+CREATE TABLE MFG.PRODUCTION_ORDERS (
+    ORDER_NUMBER       CHAR(12)       NOT NULL,
+    PLANT_CODE         CHAR(4)        NOT NULL,
+    ASSEMBLY_PART      CHAR(15)       NOT NULL,
+    ORDER_QTY          INTEGER        NOT NULL,
+    COMPLETED_QTY      INTEGER        NOT NULL WITH DEFAULT 0,
+    SCRAP_QTY          INTEGER        NOT NULL WITH DEFAULT 0,
+    ORDER_DATE         DATE           NOT NULL,
+    DUE_DATE           DATE           NOT NULL,
+    COMPLETION_DATE    DATE,
+    STATUS             CHAR(2)        NOT NULL WITH DEFAULT 'PL',
+    PRIORITY           SMALLINT       NOT NULL WITH DEFAULT 5,
+    SHIFT_CODE         CHAR(1)        NOT NULL WITH DEFAULT '1',
+    CONSTRAINT PK_PROD_ORDER PRIMARY KEY (ORDER_NUMBER)
+) IN MFGDB.MFGTS
+  CCSID EBCDIC;
+
+COMMENT ON TABLE MFG.PRODUCTION_ORDERS IS
+    'Active and completed production orders for assembly lines';
+
+------------------------------------------------------------------
+-- WARRANTY_CLAIMS: DEALER WARRANTY CLAIM HISTORY
+------------------------------------------------------------------
+CREATE TABLE MFG.WARRANTY_CLAIMS (
+    CLAIM_NUMBER       CHAR(12)       NOT NULL,
+    DEALER_CODE        CHAR(8)        NOT NULL,
+    VIN                CHAR(17)       NOT NULL,
+    PART_NUMBER        CHAR(15)       NOT NULL,
+    WARRANTY_TYPE      CHAR(2)        NOT NULL,
+    DEFECT_CODE        CHAR(6)        NOT NULL,
+    REPAIR_DATE        DATE           NOT NULL,
+    MILEAGE            INTEGER        NOT NULL,
+    SALE_DATE          DATE           NOT NULL,
+    LABOR_HOURS        DECIMAL(5,2)   NOT NULL,
+    LABOR_RATE         DECIMAL(7,2)   NOT NULL,
+    PARTS_COST         DECIMAL(9,2)   NOT NULL,
+    SUBLET_COST        DECIMAL(9,2)   NOT NULL WITH DEFAULT 0,
+    SETTLEMENT_AMT     DECIMAL(9,2),
+    DISPOSITION        CHAR(2)        NOT NULL WITH DEFAULT 'PN',
+    PROCESS_DATE       DATE,
+    CONSTRAINT PK_WARRANTY PRIMARY KEY (CLAIM_NUMBER)
+) IN MFGDB.MFGTS
+  CCSID EBCDIC;
+
+CREATE INDEX MFG.IX_WARR_VIN
+    ON MFG.WARRANTY_CLAIMS (VIN)
+    USING STOGROUP MFGSG
+    BUFFERPOOL BP0;
+
+CREATE INDEX MFG.IX_WARR_PART
+    ON MFG.WARRANTY_CLAIMS (PART_NUMBER)
+    USING STOGROUP MFGSG
+    BUFFERPOOL BP0;
+
+CREATE INDEX MFG.IX_WARR_DEALER
+    ON MFG.WARRANTY_CLAIMS (DEALER_CODE, REPAIR_DATE)
+    USING STOGROUP MFGSG
+    BUFFERPOOL BP0;
+
+------------------------------------------------------------------
+-- DEFECT_CODES: REFERENCE TABLE FOR DEFECT CLASSIFICATION
+------------------------------------------------------------------
+CREATE TABLE MFG.DEFECT_CODES (
+    DEFECT_CODE        CHAR(6)        NOT NULL,
+    DEFECT_DESC        VARCHAR(60)    NOT NULL,
+    DEFECT_CATEGORY    CHAR(3)        NOT NULL,
+    SEVERITY           SMALLINT       NOT NULL,
+    CONSTRAINT PK_DEFECT PRIMARY KEY (DEFECT_CODE)
+) IN MFGDB.MFGTS
+  CCSID EBCDIC;
+
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('ENG001', 'ENGINE OIL LEAK - FRONT SEAL', 'ENG', 3);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('ENG002', 'ENGINE MISFIRE - IGNITION COIL', 'ENG', 4);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('TRN001', 'TRANSMISSION SHIFT HESITATION', 'TRN', 3);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('TRN002', 'TRANSMISSION FLUID LEAK', 'TRN', 4);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('BRK001', 'BRAKE ROTOR WARPAGE', 'BRK', 5);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('BRK002', 'ABS MODULE MALFUNCTION', 'BRK', 5);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('ELC001', 'BATTERY DRAIN - PARASITIC DRAW', 'ELC', 2);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('ELC002', 'INFOTAINMENT SYSTEM FREEZE', 'ELC', 1);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('BDY001', 'PAINT DEFECT - CLEAR COAT PEEL', 'BDY', 2);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('BDY002', 'PANEL GAP - DOOR ALIGNMENT', 'BDY', 1);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('COR001', 'UNDERBODY CORROSION - FRAME', 'COR', 4);
+INSERT INTO MFG.DEFECT_CODES VALUES
+    ('COR002', 'WHEEL WELL RUST - INNER FENDER', 'COR', 3);
+
+------------------------------------------------------------------
+-- PLANT_MASTER: MANUFACTURING PLANT REFERENCE DATA
+------------------------------------------------------------------
+CREATE TABLE MFG.PLANT_MASTER (
+    PLANT_CODE         CHAR(4)        NOT NULL,
+    PLANT_NAME         VARCHAR(40)    NOT NULL,
+    CITY               VARCHAR(25)    NOT NULL,
+    STATE              CHAR(2)        NOT NULL,
+    COUNTRY_CODE       CHAR(3)        NOT NULL,
+    DAILY_CAPACITY     INTEGER        NOT NULL,
+    SHIFT_COUNT        SMALLINT       NOT NULL WITH DEFAULT 2,
+    STATUS             CHAR(1)        NOT NULL WITH DEFAULT 'A',
+    CONSTRAINT PK_PLANT PRIMARY KEY (PLANT_CODE)
+) IN MFGDB.MFGTS
+  CCSID EBCDIC;
+
+INSERT INTO MFG.PLANT_MASTER VALUES
+    ('P001', 'ASSEMBLY PLANT - MIDWEST', 'DETROIT', 'MI', 'USA',
+     1200, 3, 'A');
+INSERT INTO MFG.PLANT_MASTER VALUES
+    ('P002', 'STAMPING PLANT - SOUTH', 'CHATTANOOGA', 'TN', 'USA',
+     800, 2, 'A');
+INSERT INTO MFG.PLANT_MASTER VALUES
+    ('P003', 'POWERTRAIN PLANT - CENTRAL', 'LIMA', 'OH', 'USA',
+     600, 2, 'A');
+INSERT INTO MFG.PLANT_MASTER VALUES
+    ('P004', 'ASSEMBLY PLANT - CANADA', 'OAKVILLE', 'ON', 'CAN',
+     1000, 3, 'A');
